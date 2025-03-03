@@ -1,0 +1,13 @@
+#!/bin/bash
+# All three
+
+trap "/usr/bin/killall -q -u $USER ./TSP 2>/dev/null" 0 1 2 3 9 15
+trap "/bin/rm -f $STDERR" 0 1 2 3 9 15
+if [ ! -x ./TSP ]; then
+  echo './TSP is missing or not executable'
+  echo './TSP is missing or not executable' 1>&2
+  exit 1
+fi
+
+
+$BIN/run -stderr=/dev/null ./TSP $WHERE/ne_6.dat -insert -given -nearest HVN ALB MHT BDL ORH PVD < /dev/null

@@ -1,0 +1,612 @@
+#!/usr/bin/perl -w
+
+use strict;
+use POSIX; # for floor
+use Cwd 'realpath';
+use File::Spec;
+use File::Basename;
+
+my $debug = 0;
+
+my $CLASS  = "223";
+my $HWK    = "2";
+my $NAME   = "TSP";        # Name of program
+my $UNIT   = "";        # Name of program
+my $TEST   = "tIJ";           # Name of test file (IJ is replaced by number)
+my $ANSWER = "tIJ.out";          # Name of answer file (IJ is replaced by number)
+my $DATE   = "01/31/2025";        # Date script written
+my $LANG   = "C";             # Language (C, Perl, ...)
+
+# Blank-separated list of illegal files; wildcards permitted
+my $hwkFiles = "";
+
+my $PROGRAM = "./$NAME";        # Name of executable
+my $UNIT_PROGRAM   = "./$UNIT";        # Name of program
+
+my %WHICH;                      # Allow individual tests on command line
+@WHICH{@ARGV}++
+   if (@ARGV);
+
+$SIG{HUP} = $SIG{INT} = $SIG{QUIT}
+   = $SIG{TERM} = \&cleanup;
+my @UNLINK;                                     # Files to delete on signal
+my $TMPDIR = "/tmp/TEST.$NAME.$$";              # Name of temporary directory
+sub cleanup {
+   unlink (@UNLINK);                            # Delete files
+   if (-e $TMPDIR) {                            # Delete temporary directory
+      system ("/bin/chmod -R +w $TMPDIR");
+      system ("/bin/rm -rf $TMPDIR");
+   }
+   exit;
+}
+
+my $WallClock = 0;
+
+$0 =~ s{^.*/}{};                                # Extract test type
+my $TYPE = ($0 =~ m{^test\.}) ? "Public" : "Final";
+print "\n$TYPE test script for $NAME ($DATE)\n\n";
+
+&limitCpuTime (20, 40);                         # Limit CPU-time per process
+&limitWallClock (60);                          # Limit wall-clock per process
+&limitFileSize (100000);                        # Limit size of files created
+#&limitHeapSize (1000000);                       # Limit size of heap
+&limitProcesses (1000);                         # Limit #processes
+
+my $where = realpath( File::Spec->rel2abs( dirname(__FILE__) ) );
+$ENV{WHERE} = $where;
+
+my $bin = "/c/cs$CLASS/bin";
+my $files = "/c/cs$CLASS/hw${HWK}";
+if ( ! -d $bin )
+{
+    $bin = "$where/../bin";
+    $files = getcwd;
+}
+elsif ( $TYPE eq "Final" )
+{
+    $files = "/c/cs$CLASS/hw${HWK}/Final";
+}
+$ENV{BIN} = $bin;
+$ENV{FILES} = $files;
+
+my $run = "$bin/run";
+my $diff = "/usr/bin/diff";
+my $head = "$bin/Head";
+
+&makeProgram
+   unless ($LANG eq "Perl");
+
+$|++;
+print "\nEach test is either passed or failed; there is no partial credit.\n\n"
+    . "To execute the test labelled IJ, type one of the following commands\n"
+    . "depending on whether the file /c/cs$CLASS/hw${HWK}/Tests/$TEST is executable or not\n"
+   . "     BIN=\"/c/cs$CLASS/bin\" WHERE=\"/c/cs$CLASS/hw${HWK}/Tests\" /c/cs$CLASS/hw${HWK}/Tests/$TEST\n"
+    . "     $PROGRAM < /c/cs$CLASS/hw${HWK}/Tests/$TEST\n"
+    . "The answer expected is in /c/cs$CLASS/hw${HWK}/Tests/$ANSWER.\n\n";
+
+my $total = 0;
+my $subtotal = 0;
+my $testCount = 0;
+my @SOURCE = ('');
+my @LINK = ();
+my $checkpoint = -1;
+&sectionHeader('Given Order');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('001', 'Cities from Example');
+$subtotal += &runTest('002', 'Different 6 cities');
+$subtotal += &runTest('003', '12 Cities');
+$total += floor($subtotal);
+&sectionResults('Given Order', $subtotal, 3, $checkpoint );
+$testCount += 3;
+
+&sectionHeader('Nearest Heuristic');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('004', 'No Reversal');
+$subtotal += &runTest('005', 'Different 6 cities');
+$subtotal += &runTest('006', 'Cities from Example (needs reversal)');
+$subtotal += &runTest('007', '12 Cities');
+$total += floor($subtotal);
+&sectionResults('Nearest Heuristic', $subtotal, 4, $checkpoint );
+$testCount += 4;
+
+&sectionHeader('Insert Heuristic');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('008', 'No Rotation or Reversal');
+$subtotal += &runTest('009', '6 Cities with Reversal');
+$subtotal += &runTest('010', 'Cities from Example');
+$subtotal += &runTest('011', 'Different 6 cities');
+$subtotal += &runTest('012', '12 Cities');
+$subtotal += &runTest('013', 'Insert Avelo Tweed Network');
+$total += floor($subtotal);
+&sectionResults('Insert Heuristic', $subtotal, 6, $checkpoint );
+$testCount += 6;
+
+&sectionHeader('City Names');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('014', 'Long city names');
+$subtotal += &runTest('015', 'Whitespace in city names');
+$subtotal += &runTest('016', 'Other nonalphabetic characters');
+$total += floor($subtotal);
+&sectionResults('City Names', $subtotal, 3, $checkpoint );
+$testCount += 3;
+
+&sectionHeader('Multiple Methods');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('017', 'Given + Insert');
+$subtotal += &runTest('018', 'Nearest + Insert');
+$subtotal += &runTest('019', 'All three');
+$subtotal += &runTest('020', 'Repeats');
+$total += floor($subtotal);
+&sectionResults('Multiple Methods', $subtotal, 4, $checkpoint );
+$testCount += 4;
+
+&sectionHeader('Location edge cases');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('021', 'Nearest with ties');
+$subtotal += &runTest('022', 'Insert with poles');
+$subtotal += &runTest('023', 'Two airports at same location');
+$total += floor($subtotal);
+&sectionResults('Location edge cases', $subtotal, 3, $checkpoint );
+$testCount += 3;
+
+&sectionHeader('Invalid Command-line Arguments');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('024', 'No arguments');
+$subtotal += &runTest('025', 'File not found');
+$subtotal += &runTest('026', 'No cities on command line');
+$subtotal += &runTest('027', 'Invalid method first');
+$subtotal += &runTest('028', 'Empty method name');
+$subtotal += &runTest('029', 'Multiple invalid methods');
+$total += floor($subtotal);
+&sectionResults('Invalid Command-line Arguments', $subtotal, 6, $checkpoint );
+$testCount += 6;
+
+&sectionHeader('Invalid Data File');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('030', 'Mismatched City Name');
+$subtotal += &runTest('031', 'Out-of-order City Names');
+$subtotal += &runTest('032', 'Empty city name out of order in location data file');
+$subtotal += &runTest('033', 'Whitespace in latitude');
+$subtotal += &runTest('034', 'Missing longitude');
+$subtotal += &runTest('035', 'Empty latitude');
+$subtotal += &runTest('036', 'Non-numeric latitude');
+$subtotal += &runTest('037', 'Comma in city name in location data file');
+$subtotal += &runTest('038', 'EOF in longitude');
+$subtotal += &runTest('039', 'Blank line at end of location data file');
+$total += floor($subtotal);
+&sectionResults('Invalid Data File', $subtotal, 10, $checkpoint );
+$testCount += 10;
+
+&sectionHeader('Valgrind (repeats some tests, checking for errors w/ valgrind)');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('040', 'Given; Cities from Example');
+$subtotal += &runTest('041', 'Nearest; Cities from Example (needs reversal)');
+$subtotal += &runTest('042', 'Insert Avelo Tweed Network');
+$subtotal += &runTest('043', 'Long city names');
+$subtotal += &runTest('044', 'Other nonalphabetic characters');
+$subtotal += &runTest('045', 'Repeats');
+$subtotal += &runTest('046', 'Missing longitude');
+$total += floor($subtotal);
+&sectionResults('Valgrind (repeats some tests, checking for errors w/ valgrind)', $subtotal, 7, $checkpoint );
+$testCount += 7;
+
+&sectionHeader('Challenge (2 sec limit; just for fun!)');
+$subtotal = 0;
+@SOURCE = ();
+@LINK = ();
+$subtotal = &runTest('047', 'Insert, 512 cities');
+$subtotal = $subtotal * 0 / 1;
+$testCount -= 1;
+$total += floor($subtotal);
+&sectionResults('Challenge (2 sec limit; just for fun!)', $subtotal, 1, $checkpoint );
+$testCount += 1;
+
+&header ('Deductions for Violating Specification (0 => no violation)');
+#$total += &deduction (localCopies($hwkFiles), "Local copy of $hwkFiles");
+
+print "\nEnd of Public Script\n";
+
+my $additional = $total;
+
+if (-f "deductions.txt") {
+    print("\n");
+    system("cat deductions.txt");
+    print("\n");
+    $subtotal = `cut -d' ' -f 1 deductions.txt | awk '{s+=\$1} END {print s}'`;
+    if ($checkpoint >= 0) {
+	$checkpoint = $checkpoint + $subtotal;
+    }
+    $total = $total + $subtotal;
+}	
+
+if ($TYPE eq "Public") {
+    if ($checkpoint >= 0)
+    {
+   	printf ("\n Total score at first checkpoint: %3d\n", $checkpoint);
+	printf ("%3d of %3d Additional tests passed for $NAME\n", $additional, $testCount);
+    }
+    else
+    {
+	printf ("\n%3d of %3d Total tests passed for $NAME\n", $total, $testCount);
+
+    }
+}
+else
+{
+	printf ("\n%3d of %3d Total tests passed for $NAME\n", $total, $testCount);
+}
+
+#&header ("Non-credit Tests");
+
+&sectionHeader ("Possible Deductions (assessed later as appropriate)");
+&possibleDeduction ( -100, "Hard-coding to defeat autograder");
+&possibleDeduction ( -10, "Deficient style (comments, identifiers, formatting, ...)");
+&possibleDeduction ( -5, "Does not make");
+&possibleDeduction ( -5, "Makefile missing");
+&possibleDeduction ( -5, "Makefile incorrect");
+&possibleDeduction ( -1, "Log file incorrectly named");
+&possibleDeduction ( -1, "Log file lacks estimated time");
+&possibleDeduction ( -1, "Log file lacks total time");
+&possibleDeduction ( -1, "Log file lacks statement of major difficulties");
+#&possibleDeduction ( -1, "Compilation errors using -Wall -std=c99 -pedantic");
+
+if ($TYPE eq "Final") {
+   print "\n";
+   system ("rm -f $PROGRAM *.o")                # Cleanup if final script
+      unless ($LANG eq "Perl");
+}
+
+if ($TYPE eq "Public") {                        # Reminder to students
+   system ("$bin/checklog -noprint");
+   system ("$bin/checkmake -noprint")
+      unless ($LANG eq "Perl");
+}
+
+exit $total;
+
+
+##########
+# Print section header for tests
+sub sectionHeader {
+   printf ("\n%11s%s\n", "", @_);
+}
+
+##########
+# Print section results for tests
+sub sectionResults {
+    my($name, $subtotal, $count, $checkpoint) = @_;
+    if ($checkpoint >= 0 or $checkpoint == -1)
+    {  
+       printf ("\n%11s%s: %d of %d tests passed\n", "", $name, $subtotal, $count);
+    }
+    else
+    {
+       printf ("\n%11s%s: %d points\n", "", $name, $subtotal);
+    }
+}
+
+
+##########
+# Print header for tests
+sub header {
+   printf ("\n%15s%s\n", "", @_);
+}
+
+   
+##########
+# Print addition
+sub addition {
+   my ($points, $title) = @_;
+   printf ("%3d point       $title\n", $points);
+   return $points;
+}
+
+
+##########
+# Print deduction
+sub deduction {
+   my ($points, $title) = @_;
+   printf ("%3d point       $title\n", $points);
+   return $points;
+}
+
+
+##########
+# Print possible deduction
+sub possibleDeduction {
+   printf ("%18d %s\n", @_);
+}
+
+
+##########
+# Skip a test
+sub skipTest {
+   my ($test, $title) = @_;
+   printf ("NOTRUN  %3s. %s\n", $test, $title);
+}
+
+##########
+# Forced fail a test
+sub failTest {
+  return 0;
+}
+
+##########
+# Run a test
+sub runTest {
+   my ($test, $title, $command, $conds) = @_;
+   my $results = "/tmp/$NAME.$$";               # Results of test
+   my $diffs   = "/tmp/diff.$$";                # Expected results vs. results
+   my $errors  = "/tmp/errs.$$";                # Error messages generated
+   my ($status, @conds, $points);
+
+   my $testFile = "$where/$TEST";               # Name of test file
+   $testFile    =~ s{IJ}{$test};
+   my $answers  = "$where/$ANSWER";             # Name of answer file
+   $answers     =~ s{IJ}{$test};
+
+   return 0                                     # Either execute all tests or
+      unless (keys %WHICH == 0                  #   only those on command line
+	      || exists $WHICH{$test});
+
+   (-r $testFile)
+      || die ("$0: missing test file $testFile\n");
+
+   push @UNLINK, $results, $errors, $diffs;     # Files to delete on signal
+
+   if (defined $command) {
+      system("$command | head -n 1");
+      $points = `$command | /usr/bin/tail -n 1`;
+      printf ("%3d point  %3s. %s\n", $points, $test, $title);
+      return floor($points)
+   }
+
+   if (-x $testFile) {
+      $status = execute ($testFile, undef, $results, $errors);
+   } elsif ($LANG eq "Perl") {
+      $status = execute ($PROGRAM, $testFile, $results, $errors);
+   } else {
+      $status = execute ("$run $PROGRAM", $testFile, $results, $errors);
+   }
+
+   if (defined $conds && $conds eq "Graceful") {
+      @conds = ('NORMAL', $status);
+   } else {
+      (-r $answers)
+	 || die ("$0: missing answer file $answers\n");
+      system ("$diff $answers $results  > $diffs  2>> $errors");
+      
+      system ("$head $diffs");
+      @conds = ('NULL', $diffs);
+
+      # this displays and tests stderr too
+      #system ("$head $errors $diffs");
+      #@conds = ('NULL', $errors, 'NULL', $diffs);
+   }
+
+   if (defined $conds && $conds eq "Error message") {
+      @conds = ('NONNULL', $errors,  'NULL', $diffs);
+   }
+
+   if (defined $conds && $conds =~ m{^Deduct=(\d+)$}) {
+      @conds = ('DEDUCT', $1, @conds);
+   }
+
+   $points = &correct (@conds);
+   if ($points == 1)
+   {
+	printf("PASSED");
+   }
+   else
+   {
+        printf("FAILED");
+   }
+   printf ("  %3s. %s\n", $test, $title);
+   system ("rm -f $results $errors $diffs");
+   pop @UNLINK;  pop @UNLINK;  pop @UNLINK;     # Remove added files
+
+   return $points;
+}
+
+
+##########
+#  correct ({[UNOP FILE] | ['NORMAL' STATUS]}*)
+#
+#  Return 1 if the conjunction of the specified tests is true, else 0, where:
+#
+#    UNOP FILE (where UNOP is either 'NULL' or 'NONNULL'):
+#      Is the size of the file FILE as specified?
+#
+#    'NORMAL' STATUS:
+#      Did the process terminate normally?
+#
+#    'DEDUCT' POINTS:
+#      Change the point values to 0 for success, -POINTS for failure
+#
+sub correct {
+   my $op;
+   my ($success, $failure) = (1, 0);
+
+   while ($op = shift) {
+      if ($op eq 'NULL') {
+	 my $arg = shift;
+	 print STDERR "$op $arg\n" if $debug;
+	 if (-s $arg) {
+	    if ($arg =~ m{/diff\.}) {
+	       print "Error: STDOUT differs from expected\n";
+	    } elsif ($arg =~ m{/errs\.}) {
+	       print "Error: STDERR should be empty\n";
+	    } else {
+	       print "Error: File $arg is nonempty\n";
+	    }
+	    return $failure;
+	 }
+
+      } elsif ($op eq 'NONNULL') {
+	 my $arg = shift;
+	 print STDERR "$op $arg\n" if $debug;
+	 if (!-s $arg) {
+	    if ($arg =~ m{/errs\.}) {
+	       print "Error: STDERR should be nonempty\n";
+	    } else {
+	       print "Error: File $arg is empty\n";
+	    }
+	    return $failure;
+	 }
+
+      } elsif ($op eq 'NORMAL') {
+	 my $arg = 127 & shift;
+	 print STDERR "$op $arg\n" if $debug;
+	 if ($arg != 0) {
+	    print "Error: Status = $arg is nonzero\n";
+	    return $failure;
+	 }
+
+      } elsif ($op eq 'DEDUCT') {
+	 my $arg = shift;
+	 ($success, $failure) = (0, -$arg);
+      }
+   }
+   return $success;
+}
+
+
+##########
+# Create program to test
+sub makeProgram {
+#  system ("rm -f $PROGRAM");                   # Delete program & object files
+#  system ("rm -f *.o")
+#     if ($TYPE eq "Final");
+   system ("/usr/bin/bash -c \"if compgen -G '$files/Required/*' > /dev/null; then cp $files/Required/* . ; fi\"");
+   system ("/usr/bin/bash -c \"if compgen -G '$files/Optional/*' > /dev/null; then cp -n $files/Optional/* . ; fi\"");
+
+   (-f "Makefile" || -f "makefile")             # Give warning if no Makefile
+      || warn ("$0: no makefile found\n");
+
+   system ("$bin/makewarn -B $PROGRAM $UNIT");
+   ($? == 0)
+      || die ("$0: cannot compile $PROGRAM and/or $UNIT\n");
+
+   (-e $PROGRAM) || die("$0: could not build executable $PROGRAM\n");
+}
+
+
+##########
+# Limit CPU-time, wall-clock-time, file-size, and/or heap-size
+use BSD::Resource;
+
+sub limitCpuTime { # (time in seconds)
+   my ($soft, $hard) = @_;
+   $hard = $soft
+      if (! defined($hard));
+   setrlimit (RLIMIT_CPU, $soft, $hard);
+}
+
+sub limitWallClock { # (time in seconds)
+   my ($wall) = @_;
+   $SIG{ALRM} = 'IGNORE';                       # Parent ignores alarms
+   $WallClock = $wall;
+}
+
+sub limitFileSize { # (size in kilobytes)
+   my ($size) = @_;
+   $size *= 1024;
+   setrlimit (RLIMIT_FSIZE, $size, $size);
+}
+
+sub limitHeapSize { # (size in kilobytes        # Bug: Has no effect
+   my ($size) = @_;
+   $size *= 1024;
+   setrlimit (RLIMIT_VMEM, $size, $size);
+}
+
+sub limitProcesses { # (#processes)             # Bug: Has no effect
+   my ($nproc) = @_;
+   setrlimit (RLIMIT_NPROC, $nproc, $nproc);
+}
+
+
+##########
+# Execute program after redirecting stdin, stdout, & stderr and return status
+sub execute {
+   my ($program, $stdin, $stdout, $stderr) = @_;
+   my ($pid, $status);
+
+   (defined ($pid = fork))                      # Create child process
+      || die ("$0: fork failed\n");
+
+   if ($pid == 0) {                             # Child process
+      open (STDIN, "<$stdin")                   #  Redirect stdin
+	 if (defined $stdin);
+      open (STDOUT, ">$stdout")                 #  Redirect stdout
+	 if (defined $stdout);
+      open (STDERR, ">$stderr")                 #  Redirect stderr
+	 if (defined $stderr);
+      mkdir ($TMPDIR)                           #  Create a temporary directory
+	 || die ("$0: mkdir $TMPDIR failed\n");
+      system("/bin/cp * $TMPDIR");               # just copy everything
+      system ("/bin/cp @LINK $TMPDIR") if (@LINK != 0); # and link to specified files
+      #system ("/bin/cp $PROGRAM $TMPDIR");      #    With a copy of the program
+      #system ("/bin/cp @SOURCE $TMPDIR") if (@SOURCE != 0); # and other required files
+      chdir ("$TMPDIR")                         #    And cd there
+	 || die ("$0: chdir $TMPDIR failed\n");
+      (exec $program)                           #  Execute command
+	 ||  die ("$0: exec failed\n");
+   }
+
+   alarm ($WallClock);                          # Set an alarm to interrupt in
+   $SIG{ALRM} =                                 # ... $WallClock seconds
+      sub {kill "TERM", $pid;
+	   if (defined $stderr) {
+	      open (ERROR, ">>$stderr")
+		 || die ("$0: open (>>$stderr) failed\n");
+	      print ERROR  "Time limit exceeded\n";
+	      close (ERROR);
+	   } else {
+	      print STDERR "Time limit exceeded\n";
+	   }
+      };
+   waitpid ($pid, 0);                           # Wait for child to die,
+   alarm (0);                                   # ... cancel alarm,
+   $status = $?;
+
+   system ("/bin/chmod -R +w $TMPDIR");         # Delete temporary directory
+   system ("/bin/rm -rf $TMPDIR");
+   (! -e $TMPDIR)
+      || die ("$0: cannot delete $TMPDIR\n");
+
+   return $status;                              # ... and return exit status
+}
+
+
+##########
+# $FILES is a blank-separated list of filenames which may include wildcards.
+# If any of these files exist in the current working directory, print their
+# names and return -1; else return 0.
+sub localCopies { # ($files)
+   my ($files) = @_;
+   open (LS, "ls -l $files 2>/dev/null |")
+       || die ("$0: cannot ls -l $files\n");
+   my @ls = <LS>;
+   close (LS);
+   print @ls;
+   return (@ls > 0) ? -1 : 0;
+}
