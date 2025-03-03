@@ -16,18 +16,6 @@
  *   <heuristic> : <total distance> <tour> 
  *
  * If no heuristic flags are provided, the program prints nothing.
- *
- * Efficiency requirements:
- *   - File reading: O(p) time.
- *   - -given   : O(n) time, O(n) space.
- *   - -nearest : O(n^2) time, O(n) space.
- *   - -insert  : O(n^3) time, O(n^2) space.
- *
- * For any invalid input, the program must not crash or hang.
- *
- * Author: Your Name
- * Version: 2025.01.31.0
- */
 
 #define _GNU_SOURCE
 
